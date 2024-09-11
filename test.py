@@ -3,9 +3,11 @@ import torch
 import numpy as np
 import argparse
 from torch.utils.data import DataLoader
+from accelerate import Accelerator
+from accelerate import load_checkpoint_and_dispatch
 
 
-def test(root, device_ids, batch_size, checkpoint):
+def test(root, batch_size, checkpoint):
 
     test_dataset = GTZAN(
         root = root,
@@ -21,12 +23,17 @@ def test(root, device_ids, batch_size, checkpoint):
         shuffle=False,
     )
 
-    device = torch.device("cuda")
+    accelerator = Accelerator()
+    device = accelerator.device
+
     model = CNN()
-    model = torch.nn.DataParallel(model, device_ids=device_ids).cuda()
+
+    model, test_dataloader = accelerator.prepare(
+        model, test_dataloader
+    )
+
     # load checkpoint
-    checkpoint = torch.load(checkpoint)
-    model.load_state_dict(checkpoint)
+    model = accelerator.load_model(model, checkpoint)
 
     # valid
     pred_ids = np.array([])
@@ -37,7 +44,10 @@ def test(root, device_ids, batch_size, checkpoint):
 
         with torch.no_grad():
             model.eval()
-            output = model(audio) 
+            output = model(audio)   
+            output = accelerator.gather_for_metrics(output)
+            target = accelerator.gather_for_metrics(target)
+
             pred_id = output.argmax(dim=1).cpu().numpy()
             target_id = target.argmax(dim=1).cpu().numpy()
 
@@ -45,17 +55,16 @@ def test(root, device_ids, batch_size, checkpoint):
             target_ids = np.append(target_ids, target_id)              
 
     acc = (pred_ids == target_ids).mean()
-    print("test acc:", f"{acc.item() * 100:.2f}%")
+    accelerator.print("test acc:", f"{acc.item() * 100:.2f}%")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=str, default="/datasets/gtzan")
-    parser.add_argument("--device_ids", type=int, nargs='+', default=[0,1,2])
-    parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--checkpoint", type=str, default="./checkpoints/epoch20.pth")
+    parser.add_argument("--batch_size", type=int, default=54)
+    parser.add_argument("--checkpoint", type=str, default="./checkpoints/epoch100.pth")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     seed_everything(args.seed)
-    test(args.root, args.device_ids,args.batch_size, args.checkpoint)
+    test(args.root,args.batch_size, args.checkpoint)

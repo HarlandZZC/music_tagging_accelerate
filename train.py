@@ -219,7 +219,10 @@ def train(root, epochs, batch_size, lr):
         # save model
         if epoch % 10 == 0 and epoch != 0:
             accelerator.wait_for_everyone()
-            accelerator.save_model(model, f"./checkpoints/epoch{epoch}.pth")
+            unwrapped_model = accelerator.unwrap_model(model)
+            if "./checkpoints" not in os.listdir():
+                os.makedirs("./checkpoints", exist_ok=True)
+            torch.save(unwrapped_model.state_dict(), f"./checkpoints/epoch{epoch}.pth")
         
         # train
         if epoch == epochs:
@@ -244,7 +247,7 @@ def train(root, epochs, batch_size, lr):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=str, default="/datasets/gtzan")
-    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch_size", type=int, default=54)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--seed", type=int, default=42)

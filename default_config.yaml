@@ -4,7 +4,7 @@ debug: false
 distributed_type: MULTI_GPU
 downcast_bf16: 'no'
 enable_cpu_affinity: false
-gpu_ids: 0,2
+gpu_ids: 0,1
 machine_rank: 0
 main_process_ip: 192.168.1.150
 main_process_port: 29501

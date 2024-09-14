@@ -193,40 +193,8 @@ def train(root, epochs, batch_size, lr):
     )
 
     step = 0
-    for epoch in range(epochs+1):
-        # valid
-        pred_ids = np.array([])
-        target_ids = np.array([])
-        for audio, target in valid_dataloader:
-            audio = audio.to(device)
-            target = target.to(device)
-
-            with torch.no_grad():
-                model.eval()
-                output = model(audio)   
-                output = accelerator.gather_for_metrics(output)
-                target = accelerator.gather_for_metrics(target)
-
-                pred_id = output.argmax(dim=1).cpu().numpy()
-                target_id = target.argmax(dim=1).cpu().numpy()
-
-                pred_ids = np.append(pred_ids, pred_id)
-                target_ids = np.append(target_ids, target_id)
-
-        acc = (pred_ids == target_ids).mean()
-        accelerator.print("epoch:", epoch, "valid acc:", f"{acc.item() * 100:.2f}%")
-
-        # save model
-        if epoch % 10 == 0 and epoch != 0:
-            accelerator.wait_for_everyone()
-            unwrapped_model = accelerator.unwrap_model(model)
-            if "./checkpoints" not in os.listdir():
-                os.makedirs("./checkpoints", exist_ok=True)
-            torch.save(unwrapped_model.state_dict(), f"./checkpoints/epoch{epoch}.pth")
-        
+    for epoch in range(1, epochs+1):
         # train
-        if epoch == epochs:
-            break
         for audio, target in train_dataloader:
             audio = audio.to(device)
             target = target.to(device)
@@ -241,8 +209,41 @@ def train(root, epochs, batch_size, lr):
             step += 1
 
             loss = accelerator.gather_for_metrics(loss)
-            accelerator.print("epoch:", epoch+1, "step:", step, "loss:", loss.cpu().numpy())
+            accelerator.print("epoch:", epoch, "step:", step, "loss:", loss.cpu().numpy())
 
+        # valid
+        if epoch % 1 == 0:
+            pred_ids = np.array([])
+            target_ids = np.array([])
+            for audio, target in valid_dataloader:
+                audio = audio.to(device)
+                target = target.to(device)
+
+                with torch.no_grad():
+                    model.eval()
+                    output = model(audio)   
+                    output = accelerator.gather_for_metrics(output)
+                    target = accelerator.gather_for_metrics(target)
+
+                    pred_id = output.argmax(dim=1).cpu().numpy()
+                    target_id = target.argmax(dim=1).cpu().numpy()
+
+                    pred_ids = np.append(pred_ids, pred_id)
+                    target_ids = np.append(target_ids, target_id)
+                    model.train()
+
+            acc = (pred_ids == target_ids).mean()
+            accelerator.print("epoch:", epoch, "valid acc:", f"{acc.item() * 100:.2f}%")
+
+        # save model
+        if epoch % 10 == 0:
+            accelerator.wait_for_everyone()
+            unwrapped_model = accelerator.unwrap_model(model)
+            if os.path.exists("./checkpoints") == False:
+                os.makedirs("./checkpoints")
+            if os.path.exists(f"./checkpoints/epoch{epoch}.pth") == True:
+                os.remove(f"./checkpoints/epoch{epoch}.pth")
+            torch.save(unwrapped_model.state_dict(), f"./checkpoints/epoch{epoch}.pth")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

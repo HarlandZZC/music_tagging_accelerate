@@ -31,7 +31,7 @@ def test(root, device_id, batch_size, checkpoint):
     checkpoint = torch.load(checkpoint)
     model.load_state_dict(checkpoint)
 
-    # valid
+    # test
     pred_ids = np.array([])
     target_ids = np.array([])
     for audio, target in test_dataloader:

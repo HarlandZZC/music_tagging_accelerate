@@ -21,13 +21,15 @@ Please follow the steps below on **both machines** to set up and run the trainin
 
     If some packages cannot be installed through the YAML file, please download them manually.
 
-3. Start training by running:
+3. Adjust the `default_config.yaml` and `train.sh` according to the server you are using.
+
+4. Start training by running:
 
    ```bash
    bash train.sh
    ```
 
-4. To evaluate the training results, run:
+5. To evaluate the training results, run:
 
    ```bash
    python test.py
